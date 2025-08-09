@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ExamSimple v2 (Clickable)</title>
+<style>
+  :root{--bg:#0b0f14;--card:#121821;--ink:#e7edf5;--line:#243246;--ok:#22c55e;--bad:#ef4444}
+  *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,Segoe UI,Roboto}
+  .wrap{max-width:760px;margin:24px auto;padding:0 16px}
+  .card{background:var(--card);border:1px solid #1c2533;border-radius:14px;box-shadow:0 8px 28px #0005}
+  header{padding:14px 16px;border-bottom:1px solid #1c2533;display:flex;gap:10px;align-items:center;justify-content:space-between}
+  .body{padding:16px}
+  .btn{appearance:none;border:1px solid var(--line);background:#1a2533;color:var(--ink);padding:10px 14px;border-radius:12px;cursor:pointer}
+  .btn.primary{background:#4da3ff;color:#081018;border-color:#7ab9ff;font-weight:700}
+  .btn:disabled{opacity:.6;cursor:not-allowed}
+  textarea{width:100%;min-height:150px;background:#0e1420;color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:12px}
+  .q{font-size:18px;line-height:1.45;margin-bottom:12px}
+  .opts{display:grid;gap:8px;margin-bottom:12px}
+  .opt{display:block;width:100%;text-align:left;border:2px solid #2a3a52;background:#0f1624;color:var(--ink);padding:12px;border-radius:10px;cursor:pointer}
+  .opt.correct{border-color:var(--ok);background:#0f2a1a}
+  .opt.wrong{border-color:var(--bad);background:#2a1111}
+  .hud{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+  .pill{border:1px solid #2a3a52;border-radius:999px;padding:6px 10px;background:#0e1520}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <header>
+      <div>ExamSimple v2 — ทำทีละข้อ</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <label class="btn" for="file">นำเข้า JSON</label>
+        <input id="file" type="file" accept=".json" hidden>
+        <button class="btn" id="loadSample">โหลดตัวอย่าง</button>
+        <button class="btn primary" id="start">เริ่มทำ</button>
+      </div>
+    </header>
+    <div class="body">
+      <div class="hud">
+        <span class="pill" id="title">ยังไม่ได้เริ่ม</span>
+        <span class="pill" id="hud">0/0 | คะแนน 0</span>
+      </div>
+      <textarea id="bank"></textarea>
+      <div id="play" style="margin-top:12px"></div>
+    </div>
+  </div>
+</div>
+<script>
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+
+const sample={title:"แบบทดสอบตัวอย่าง",
+questions:[
+  {q:"การนำเทคโนโลยีต่างๆ เข้ามาช่วยปรับเปลี่ยนโครงสร้างและพัฒนาธุรกิจ เรียกว่าอะไร",
+   choices:[{t:"Digital Business",correct:true},{t:"Digital Intelligence"},{t:"Digital Disruption"},{t:"Digital Technology"},{t:"Digital Transformation"}]},
+  {q:"ข้อใดคือการ DISRUPTION ในยุค E-COMMERCE",
+   choices:[{t:"สร้างกระบวนการทางธุรกิจที่สามารถทำงานอัตโนมัติได้",correct:true},{t:"เทคโนโลยีใหม่ ๆ"},{t:"อินเทอร์เน็ต และเทคโนโลยีดิจิทัล อื่น ๆ"},{t:"สร้างความสัมพันธ์อันดีกับลูกค้า และเข้าใจลูกค้าอย่างลึกซึ้ง"},{t:"สร้างคุณค่าใหม่ ๆ และกลุ่มลูกค้าใหม่ที่ไม่ใช่มนุษย์"}]}
+]};
+
+let bank=JSON.parse(JSON.stringify(sample));
+let items=[]; let i=0; let score=0;
+
+const bankTA=$('#bank'), titleEl=$('#title'), hud=$('#hud'), play=$('#play');
+
+function loadBank(){ bankTA.value=JSON.stringify(bank,null,2); titleEl.textContent=bank.title||'แบบทดสอบ'; hud.textContent='0/0 | คะแนน 0'; }
+function shuffle(a){ const x=[...a]; for(let j=x.length-1;j>0;j--){ const k=Math.floor(Math.random()*(j+1)); [x[j],x[k]]=[x[k],x[j]];} return x; }
+$('#loadSample').onclick=()=>{ bank=JSON.parse(JSON.stringify(sample)); loadBank(); };
+$('#file').onchange=async e=>{ const f=e.target.files?.[0]; if(!f) return; try{ bank=JSON.parse(await f.text()); loadBank(); }catch{ alert('ไฟล์ไม่ใช่ JSON ที่ถูกต้อง'); } };
+
+$('#start').onclick=()=>{
+  try{ bank=JSON.parse(bankTA.value);}catch{ alert('JSON ไม่ถูกต้อง'); return; }
+  items = shuffle((bank.questions||[]).map(q=>({ q:q.q, choices: shuffle(q.choices||[]) })));
+  i=0; score=0; render();
+};
+
+function render(){
+  play.innerHTML='';
+  if(i>=items.length){ renderFinish(); return; }
+  const it=items[i];
+  const box=document.createElement('div');
+  box.innerHTML=`
+    <div class="q">ข้อ ${i+1} / ${items.length}<br>${escape(it.q)}</div>
+    <div class="opts"></div>
+    <div style="display:flex;gap:8px;justify-content:space-between">
+      <button class="btn" id="prev" ${i===0?'disabled':''}>ก่อนหน้า</button>
+      <button class="btn primary" id="next" disabled>ถัดไป</button>
+    </div>`;
+  const opts=$('.opts',box);
+  it.choices.forEach((c,idx)=>{
+    const b=document.createElement('button');
+    b.type='button';
+    b.className='opt';
+    b.textContent=`${String.fromCharCode(65+idx)}. ${c.t}`;
+    b.addEventListener('click', ()=>select(idx));
+    opts.appendChild(b);
+  });
+  function select(idx){
+    if(box.dataset.done) return;
+    box.dataset.done='1';
+    const correctIndex = it.choices.findIndex(x=>x.correct);
+    const nodes=$$('.opt',box);
+    nodes.forEach((n,k)=>{ if(k===correctIndex) n.classList.add('correct'); });
+    if(idx!==correctIndex){ nodes[idx].classList.add('wrong'); } else { score++; }
+    $('#next',box).disabled=false;
+    hud.textContent=`${Math.min(i+1,items.length)}/${items.length} | คะแนน ${score}`;
+  }
+  $('#next',box).onclick=()=>{ i++; render(); };
+  $('#prev',box).onclick=()=>{ if(i>0){ i--; render(); } };
+  play.appendChild(box);
+  hud.textContent=`${i+1}/${items.length} | คะแนน ${score}`;
+}
+function renderFinish(){
+  const pct=Math.round((score/items.length)*100);
+  const done=document.createElement('div');
+  done.innerHTML=`<h3 style="margin:4px 0">จบแบบทดสอบ</h3>
+  <div class="pill">ได้ ${score}/${items.length} ข้อ — ${pct}%</div>
+  <div style="margin-top:10px"><button class="btn primary" id="again">เริ่มใหม่</button></div>`;
+  $('#again',done).onclick=()=>$('#start').click();
+  play.appendChild(done);
+}
+function escape(s){ return String(s).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m])); }
+loadBank();
+</script>
+</body>
+</html>
